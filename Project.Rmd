@@ -1,0 +1,88 @@
+---
+title: "Project"
+author: "Wen Jie"
+date: "19 June 2015"
+output: html_document
+---
+
+## Summary
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+### Libraries
+
+The following libraries were used throughout the code.
+
+```{r}
+library(caret)
+library(corrplot)
+library(kernlab)
+library(knitr)
+library(randomForest)
+opts_chunk$set(cache = FALSE)
+```
+
+### Load the data
+
+The training data was then loaded into R.
+
+```{r}
+# read the csv file for training 
+data_training <- read.csv("pml-training.csv", na.strings= c("NA",""," "))
+# clean the data by removing columns with NAs etc
+data_training_NAs <- apply(data_training, 2, function(x) {sum(is.na(x))})
+data_training_clean <- data_training[,which(data_training_NAs == 0)]
+# remove identifier columns such as name, timestamps etc
+data_training_clean <- data_training_clean[8:length(data_training_clean)]
+```
+
+### Create model
+
+The test data set was split up into training and cross validation sets in a 70:30 ratio in order to train the model and then test it against data it was not specifically fitted to. This is known to be a standard practice.
+
+```{r}
+# split the cleaned testing data into training and cross validation
+inTrain <- createDataPartition(y = data_training_clean$classe, p = 0.7, list = FALSE)
+training <- data_training_clean[inTrain, ]
+testing <- data_training_clean[-inTrain, ]
+
+# plot a correlation matrix
+correlMatrix <- cor(training[, -length(training)])
+corrplot(correlMatrix, order = "FPC", method = "circle", type = "lower", tl.cex = 0.8,  tl.col = rgb(0, 0, 0))
+```
+In this type of plot the dark red and blue colours indicate a highly negative and positive relationship respectively between the variables. There isn't much concern for highly correlated predictors which means that all of them can be included in the model.
+
+Then a model was fitted with the outcome set to the training class and all the other variables used to predict.
+
+```{r}
+# fit a model to predict the classe using everything else as a predictor
+model <- randomForest(classe ~ ., data = training)
+model
+```
+The model produced a very small OOB error rate of .47%. This was deemed satisfactory enough to progress the testing.
+
+###Cross-validation
+
+The model was then used to classify the remaining 30% of data. The results were placed in a confusion matrix along with the actual classifications in order to determine the accuracy of the model.
+
+```{r}
+# crossvalidate the model using the remaining 30% of data
+predictCrossVal <- predict(model, testing)
+confusionMatrix(testing$classe, predictCrossVal)
+```
+This model yielded a 99.3% prediction accuracy. Again, this model proved very robust and adequete to predict new data.
+
+###Predictions
+
+A separate data set was then loaded into R and cleaned in the same manner as before. The model was then used to predict the classifications of the 20 results of this new data.
+```{r}
+# apply the same treatment to the final testing data
+data_test <- read.csv("pml-testing.csv", na.strings= c("NA",""," "))
+data_test_NAs <- apply(data_test, 2, function(x) {sum(is.na(x))})
+data_test_clean <- data_test[,which(data_test_NAs == 0)]
+data_test_clean <- data_test_clean[8:length(data_test_clean)]
+
+# predict the classes of the test set
+predictTest <- predict(model, data_test_clean)
+predictTest
+```
